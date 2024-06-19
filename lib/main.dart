@@ -1,7 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:uas_ai/src/views/index.dart';
+import 'package:uas_ai/src/views/login.dart';
 
 String apiKey = "AIzaSyDtAaoHf7trD1-uC-ku91XFI1ITWTUvQQE";
 
@@ -20,18 +21,17 @@ class MyApp extends StatelessWidget {
       title: 'Tugas AI',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        bottomSheetTheme: const BottomSheetThemeData(
+          shape: LinearBorder(),
+          backgroundColor: Colors.black),
         textTheme: GoogleFonts.latoTextTheme(textTheme).copyWith(
           bodyMedium: GoogleFonts.sourceCodePro(textStyle: textTheme.bodyMedium, color: Colors.white),
         ),
         scaffoldBackgroundColor: Colors.black,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          elevation: 0
-        ),
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: CupertinoColors.activeBlue),
         useMaterial3: true,
       ),
-      home: const ChatRoomScreen()
+      home: const LoginPage()
     );
   }
 }
