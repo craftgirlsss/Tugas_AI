@@ -7,6 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:uas_ai/src/components/bottom_sheet_preview.dart';
+import 'package:uas_ai/src/components/greetings_text.dart';
+import 'package:uas_ai/src/controllers/auth_controller.dart';
 import '../controllers/generate_ai_controller.dart';
 
 enum TtsState { playing, stopped, paused, continued }
@@ -27,6 +30,7 @@ class ChatRoomScreen extends StatefulWidget {
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   SpeechToText speechToText = SpeechToText();
+  AuthController authController = Get.find();
   GenerateController aiController = Get.put(GenerateController());
   TextEditingController textEditingController = TextEditingController();
   // FlutterTts flutterTts = FlutterTts();
@@ -103,13 +107,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leadingWidth: 10,
-          title: Text("Tugas AI", style: GoogleFonts.sourceCodePro(color: Colors.white),),
+          title: Obx(() => Text("Sugeng ${greeting().toLowerCase()}, ${authController.userModels[0].nama}", overflow: TextOverflow.fade, style: GoogleFonts.sourceCodePro(color: Colors.white, fontSize: 18),)),
           actions: [
-            IconButton(
-              onPressed: (){},
-              icon: CircleAvatar(
-                onBackgroundImageError: (exception, stackTrace) => Image.asset('assets/icons/ic_launcher.png'),
-                backgroundImage: const AssetImage('assets/icons/ic_launcher.png'),
+            Obx(() => IconButton(
+                onPressed: authController.isLoading.value ? (){} : () async {
+                  showProfileInformation(context, nama: authController.userModels[0].nama, nim: authController.userModels[0].nim, email: authController.userModels[0].email);
+                },
+                icon: CircleAvatar(
+                  onBackgroundImageError: (exception, stackTrace) => Image.asset('assets/icons/ic_launcher.png'),
+                  backgroundImage: const AssetImage('assets/icons/ic_launcher.png'),
+                ),
               ),
             )
           ],
