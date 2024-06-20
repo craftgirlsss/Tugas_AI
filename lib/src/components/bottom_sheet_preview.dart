@@ -60,7 +60,10 @@ showProfileInformation(context, {String? nama, String? nim, String? email}){
                   ),
                   onPressed: ()async{
                   SharedPreferences prefs = await SharedPreferences.getInstance();
-                  prefs.remove('login').then((value) => Navigator.pushAndRemoveUntil(context, CupertinoPageRoute(builder: (context) => const LoginPage()), (route) => false));
+                  prefs.remove('login').then((value) {
+                    prefs.remove('uuid');
+                    Navigator.pushAndRemoveUntil(context, CupertinoPageRoute(builder: (context) => const LoginPage()), (route) => false);
+                  });
                 }, child: const Text("Log out", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),))
               ],
             ),

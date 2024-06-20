@@ -37,3 +37,22 @@ void showAlertDialogLogin(context) {
       ),
     );
   }
+
+void showAlertDialogFiturStillDevelopment(context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (BuildContext context) => CupertinoAlertDialog(
+        title: const Text('Gagal'),
+        content: const Text('Fitur sek dikembangno'),
+        actions: <CupertinoDialogAction>[
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Nggeh'),
+          ),
+        ],
+      ),
+    );
+  }

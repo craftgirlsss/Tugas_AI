@@ -1,6 +1,7 @@
 import 'package:chat_bubbles/chat_bubbles.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 // import 'package:flutter_tts/flutter_tts.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -33,6 +34,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   AuthController authController = Get.find();
   GenerateController aiController = Get.put(GenerateController());
   TextEditingController textEditingController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   // FlutterTts flutterTts = FlutterTts();
   bool speechEnabled = false;
   String lastWords = '';
@@ -42,6 +44,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   bool get isPaused => ttsState == TtsState.paused;
   bool get isContinued => ttsState == TtsState.continued;
   List<ChatModels> textMessageBubble = [];
+  bool _needsScroll = false;
 
   void _initSpeech() async {
     speechEnabled = await speechToText.initialize();
@@ -78,6 +81,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       aiController.postPromptGemini([Content.text(result.recognizedWords)]).then(
         (value) {
           textMessageBubble.add(ChatModels(sender: false, text: value));
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut
+          );
+          _needsScroll = true;
           // _speak(value);
         }
       );
@@ -99,6 +108,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_needsScroll) {
+      _scrollToEnd();
+      _needsScroll = false;
+    }
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
@@ -133,30 +146,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 )
               ),
             ),
-            // Center(
-            //   child: GradientText(
-            //     text: "Sugeng ${greeting()}",
-            //     gradient: LinearGradient(colors: [
-            //       Colors.green.shade300,
-            //       Colors.blue.shade700,
-            //     ]),
-            //     style: GoogleFonts.sourceCodePro(fontSize: 30, fontWeight: FontWeight.bold),
-            //   ),
-            // ),
-            // Container(
-            //   width: MediaQuery.of(context).size.width,
-            //   height: MediaQuery.of(context).size.height,
-            //   color: Colors.black.withOpacity(0.5),
-            // ),
             SafeArea(
               child: Obx(() => aiController.isLoading.value ? 
               SingleChildScrollView(
+                controller: _scrollController,
                   padding: const EdgeInsets.only(left: 5, right: 5, top: 10, bottom: 50),
                   child: Column(
-                    children: List.generate(textMessageBubble.length, (index) => BubbleSpecialOne(
+                    children: List.generate(textMessageBubble.length, (index) => BubbleSpecialThree(
                       isSender: textMessageBubble[index].sender ?? true,
                       text: textMessageBubble[index].text ?? '',
-                      color: CupertinoColors.activeGreen,
+                      color: textMessageBubble[index].sender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
                       tail: true,
                       textStyle: const TextStyle(
                           color: Colors.white,
@@ -165,18 +164,35 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     )
                   ),
                 ) : SingleChildScrollView(
+                  controller: _scrollController,
                   padding: const EdgeInsets.only(left: 5, right: 5, top: 10, bottom: 70),
                   child: Column(
                     children: List.generate(textMessageBubble.length, (index) => 
-                    BubbleSpecialThree(
-                      seen: true,
-                      isSender: textMessageBubble[index].sender ?? true,
-                      text: textMessageBubble[index].text ?? '',
-                      color: textMessageBubble[index].sender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
-                      tail: true,
-                      textStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16),
+                    CupertinoContextMenu(
+                      enableHapticFeedback: true,
+                      actions: [
+                        CupertinoContextMenuAction(
+                          onPressed: () async {
+                            await Clipboard.setData(ClipboardData(text: textMessageBubble[index].text ?? '')).then((value) => Navigator.pop(context));
+                          },
+                          isDefaultAction: true,
+                          trailingIcon: CupertinoIcons.doc_on_clipboard_fill,
+                          child: const Text('Copy'),
+                        ),
+                      ],
+                      child: DefaultTextStyle(
+                        style: const TextStyle(),
+                        child: BubbleSpecialThree(
+                          seen: true,
+                          isSender: textMessageBubble[index].sender ?? true,
+                          text: textMessageBubble[index].text ?? '',
+                          color: textMessageBubble[index].sender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
+                          tail: true,
+                          textStyle: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16),
+                          ),
+                      ),
                       ),
                     )
                   ),
@@ -211,7 +227,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     height: 30,
                     child: Obx(() => CupertinoTextField(
                         textInputAction: TextInputAction.go,
-                        onSubmitted: aiController.isLoading.value ? (value){} : (value) {
+                        onSubmitted: aiController.isLoading.value ? (value) {} : (value) {
                           setState(() {
                             textMessageBubble.add(ChatModels(sender: true, text: textEditingController.text));
                           });
@@ -219,6 +235,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             (value) {
                               textMessageBubble.add(ChatModels(sender: false, text: value));
                               // _speak(value);
+                              setState(() {
+                                _scrollController.animateTo(
+                                  _scrollController.position.maxScrollExtent,
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeInOut
+                                );
+                                _needsScroll = true;
+                              });
                             }
                           );
                           textEditingController.clear();
@@ -227,7 +251,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         padding: const EdgeInsets.only(left: 10),
                         textAlignVertical: TextAlignVertical.center,
                         controller: textEditingController,
-                        style: const TextStyle(color: Colors.white60, fontFamily: "SF-Pro-Bold", fontSize: 17),
+                        style: const TextStyle(color: Colors.white, fontFamily: "SF-Pro-Bold", fontSize: 17),
                         decoration: BoxDecoration(
                           color: Colors.black,
                           borderRadius: BorderRadius.circular(30),
@@ -248,6 +272,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     child: Obx(() => InkWell(
                         splashColor: Colors.red, // Splash color
                         onTap: aiController.isLoading.value ? (){} : () {
+                          HapticFeedback.vibrate();
                           setState(() {
                             textMessageBubble.add(ChatModels(sender: true, text: textEditingController.text));
                           });
@@ -255,6 +280,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             (value) {
                               textMessageBubble.add(ChatModels(sender: false, text: value));
                               // _speak(value);
+                              setState(() {
+                                _scrollController.animateTo(
+                                  _scrollController.position.maxScrollExtent,
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeInOut
+                                );
+                                _needsScroll = true;
+                              });
                             }
                           );
                           textEditingController.clear();
@@ -270,5 +303,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
       ),
     );
+  }
+  
+  _scrollToEnd() async {
+    _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(microseconds: 200), curve: Curves.easeInOut);
   }
 }

@@ -9,6 +9,7 @@ class AuthController extends GetxController{
   var userModels = <UserModels>[].obs;
 
   Future<bool> login({String? nim, String? password}) async {
+    String? uuid;
     isLoading(true);
     List result = await Supabase.instance.client.from('tugas_ai_auth').select('*').eq('nim', nim!).eq('password', password!).limit(1);
     if(result.length == 0){
@@ -18,6 +19,10 @@ class AuthController extends GetxController{
       SharedPreferences prefs = await SharedPreferences.getInstance();
       if(await prefs.setBool('login', true)){
         userModels.value = result.map((e) => UserModels.fromJson(e)).toList();
+        uuid = userModels[0].uuid;
+        if(await prefs.setString('uuid', userModels[0].uuid!)){
+          print("ini UUID setelah login dengan nim dan password $uuid");
+        }
         isLoading(false);
         return true;
       }else{
@@ -57,14 +62,15 @@ class AuthController extends GetxController{
   Future<bool> loginWithUUID() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? uuid = prefs.getString('uuid');
+    print("ini UUID $uuid");
     isLoading(true);
     List result = await Supabase.instance.client.from('tugas_ai_auth').select('*').eq('uuid', uuid!).limit(1);
     print(result);
     if(result.length == 0){
-      userModels.value = result.map((e) => UserModels.fromJson(e)).toList();
       isLoading(false);
       return false;
     }else{
+      userModels.value = result.map((e) => UserModels.fromJson(e)).toList();
       isLoading(false);
       return true;
     }

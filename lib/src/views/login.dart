@@ -115,7 +115,7 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                   TextButton(
                                     onPressed: (){
-                                      // Navigator.push(context, CupertinoPageRoute(builder: (context) => const ForgotPassword()));
+                                      showAlertDialogFiturStillDevelopment(context);
                                     },
                                     child: const Text("Lali password?"), 
                                   )
