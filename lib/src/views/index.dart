@@ -2,15 +2,18 @@ import 'package:chat_bubbles/chat_bubbles.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uas_ai/src/components/bottom_sheet_preview.dart';
 import 'package:uas_ai/src/components/greetings_text.dart';
+import 'package:uas_ai/src/components/loadings.dart';
 import 'package:uas_ai/src/controllers/auth_controller.dart';
+import 'package:uas_ai/src/controllers/chat_controllers.dart';
 import '../controllers/generate_ai_controller.dart';
 
 enum TtsState { playing, stopped, paused, continued }
@@ -32,10 +35,11 @@ class ChatRoomScreen extends StatefulWidget {
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   SpeechToText speechToText = SpeechToText();
   AuthController authController = Get.find();
+  ChatControllers chatControllers = Get.put(ChatControllers());
   GenerateController aiController = Get.put(GenerateController());
   TextEditingController textEditingController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  // FlutterTts flutterTts = FlutterTts();
+  FlutterTts flutterTts = FlutterTts();
   bool speechEnabled = false;
   String lastWords = '';
   TtsState ttsState = TtsState.stopped;
@@ -51,6 +55,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   void startListening() async {
+    stopSpeak();
     await speechToText.listen(onResult: _onSpeechResult);
     setState(() {});
   }
@@ -60,44 +65,52 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     setState(() {});
   }
 
-  // Future _speak(String text) async{
-  //   var result = await flutterTts.speak(text);
-  //   if (result == 1) setState(() => ttsState = TtsState.playing);
-  // }
+  Future _speak(String text) async{
+    var result = await flutterTts.speak(text);
+    if (result == 1) setState(() => ttsState = TtsState.playing);
+  }
 
-  // Future stopSpeak() async{
-  //     var result = await flutterTts.stop();
-  //     if (result == 1) setState(() => ttsState = TtsState.stopped);
-  // }
+  Future stopSpeak() async{
+    var result = await flutterTts.stop();
+    if (result == 1) setState(() => ttsState = TtsState.stopped);
+  }
 
-  void _onSpeechResult(SpeechRecognitionResult result) {
+  _onSpeechResult(SpeechRecognitionResult result) async {
     setState(() {
       lastWords = result.recognizedWords;
       textEditingController.text = result.recognizedWords;
     });
     if(result.finalResult){
       textMessageBubble.add(ChatModels(sender: true, text: result.recognizedWords));
+      await chatControllers.insertMessage(
+        isSender: true,
+        message: result.recognizedWords
+      );
       textEditingController.clear();
       aiController.postPromptGemini([Content.text(result.recognizedWords)]).then(
-        (value) {
+        (value) async {
           textMessageBubble.add(ChatModels(sender: false, text: value));
+          await chatControllers.insertMessage(
+            isSender: false,
+            message: value
+          );
           _scrollController.animateTo(
             _scrollController.position.maxScrollExtent,
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut
           );
-          _needsScroll = true;
-          // _speak(value);
+          // _needsScroll = true;
+          _speak(value);
         }
       );
     }
-  }
-  
+  }  
 
   @override
   void initState() {
     _initSpeech();
     super.initState();
+    chatControllers.getHistoryMessages();
   }
 
   @override
@@ -117,10 +130,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.black,
           elevation: 0,
           leadingWidth: 10,
-          title: Obx(() => Text("Sugeng ${greeting().toLowerCase()}, ${authController.userModels[0].nama}", overflow: TextOverflow.fade, style: GoogleFonts.sourceCodePro(color: Colors.white, fontSize: 18),)),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Obx(() => Text("Sugeng ${greeting().toLowerCase()}, ${authController.userModels[0].nama}", overflow: TextOverflow.fade, style: GoogleFonts.sourceCodePro(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),)),
+              Text(DateFormat('EE,').add_jm().format(DateTime.now().toLocal()), style: GoogleFonts.sourceCodePro(color: Colors.white, fontSize: 13),)
+            ],
+          ),
           actions: [
             Obx(() => IconButton(
                 onPressed: authController.isLoading.value ? (){} : () async {
@@ -146,28 +165,44 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 )
               ),
             ),
-            SafeArea(
+            RefreshIndicator(
+              onRefresh: () async => await chatControllers.getHistoryMessages(),
               child: Obx(() => aiController.isLoading.value ? 
-              SingleChildScrollView(
-                controller: _scrollController,
-                  padding: const EdgeInsets.only(left: 5, right: 5, top: 10, bottom: 50),
-                  child: Column(
-                    children: List.generate(textMessageBubble.length, (index) => BubbleSpecialThree(
-                      isSender: textMessageBubble[index].sender ?? true,
-                      text: textMessageBubble[index].text ?? '',
-                      color: textMessageBubble[index].sender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
-                      tail: true,
-                      textStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16),
-                      ),
-                    )
-                  ),
-                ) : SingleChildScrollView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(left: 5, right: 5, top: 10, bottom: 70),
-                  child: Column(
-                    children: List.generate(textMessageBubble.length, (index) => 
+                ListView(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  children: List.generate(chatControllers.chatModels.length, (index) => CupertinoContextMenu(
+                    enableHapticFeedback: true,
+                      actions: [
+                        CupertinoContextMenuAction(
+                          onPressed: () async {
+                            await Clipboard.setData(ClipboardData(text: textMessageBubble[index].text ?? '')).then((value) => Navigator.pop(context));
+                          },
+                          trailingIcon: CupertinoIcons.doc_on_clipboard_fill,
+                          child: const Text('Copy'),
+                        ),
+                        CupertinoContextMenuAction(
+                          onPressed: () {},
+                          trailingIcon: CupertinoIcons.share,
+                          child: const Text('Bagikan'),
+                        ),
+                      ],
+                        child: DefaultTextStyle(
+                          style: const TextStyle(),
+                          child: BubbleSpecialThree(
+                            isSender: chatControllers.chatModels[index].isSender!,
+                            text: chatControllers.chatModels[index].messages ?? 'No Messages'..replaceAll('*', ''),
+                            color: chatControllers.chatModels[index].isSender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
+                            tail: true,
+                            textStyle: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16),
+                            ),
+                          ),
+                        ),
+                      )
+                    ) : ListView(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    children: List.generate(chatControllers.chatModels.length, (index) => 
                     CupertinoContextMenu(
                       enableHapticFeedback: true,
                       actions: [
@@ -175,18 +210,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           onPressed: () async {
                             await Clipboard.setData(ClipboardData(text: textMessageBubble[index].text ?? '')).then((value) => Navigator.pop(context));
                           },
-                          isDefaultAction: true,
                           trailingIcon: CupertinoIcons.doc_on_clipboard_fill,
                           child: const Text('Copy'),
+                        ),
+                        CupertinoContextMenuAction(
+                          onPressed: () {},
+                          trailingIcon: CupertinoIcons.share,
+                          child: const Text('Bagikan'),
                         ),
                       ],
                       child: DefaultTextStyle(
                         style: const TextStyle(),
                         child: BubbleSpecialThree(
                           seen: true,
-                          isSender: textMessageBubble[index].sender ?? true,
-                          text: textMessageBubble[index].text ?? '',
-                          color: textMessageBubble[index].sender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
+                          isSender: chatControllers.chatModels[index].isSender!,
+                          text: chatControllers.chatModels[index].messages!.replaceAll('*', ''),
+                          color: chatControllers.chatModels[index].isSender == true ? CupertinoColors.activeGreen : CupertinoColors.activeBlue,
                           tail: true,
                           textStyle: const TextStyle(
                               color: Colors.white,
@@ -195,10 +234,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       ),
                       ),
                     )
-                  ),
                 ),
               ),
             ),
+            Obx(() => chatControllers.isLoading.value ? floatingLoading() : const SizedBox())
           ],
         ),
         bottomSheet: Padding(
@@ -227,14 +266,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     height: 30,
                     child: Obx(() => CupertinoTextField(
                         textInputAction: TextInputAction.go,
-                        onSubmitted: aiController.isLoading.value ? (value) {} : (value) {
+                        onSubmitted: aiController.isLoading.value ? (value) {} : (value) async {
                           setState(() {
                             textMessageBubble.add(ChatModels(sender: true, text: textEditingController.text));
                           });
+                          await chatControllers.insertMessage(
+                            isSender: true,
+                            message: textEditingController.text
+                          );
                           aiController.postPromptGemini([Content.text(textEditingController.text)]).then(
-                            (value) {
+                            (value) async {
                               textMessageBubble.add(ChatModels(sender: false, text: value));
-                              // _speak(value);
+                              await chatControllers.insertMessage(
+                                isSender: false,
+                                message: value
+                              );
+                              _speak(value);
                               setState(() {
                                 _scrollController.animateTo(
                                   _scrollController.position.maxScrollExtent,
@@ -271,15 +318,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     color: CupertinoColors.activeGreen, // Button color
                     child: Obx(() => InkWell(
                         splashColor: Colors.red, // Splash color
-                        onTap: aiController.isLoading.value ? (){} : () {
+                        onTap: aiController.isLoading.value ? (){} : () async {
+                          stopSpeak();
+                          await chatControllers.insertMessage(
+                            isSender: true,
+                            message: textEditingController.text
+                          );
                           HapticFeedback.vibrate();
                           setState(() {
                             textMessageBubble.add(ChatModels(sender: true, text: textEditingController.text));
                           });
                           aiController.postPromptGemini([Content.text(textEditingController.text)]).then(
-                            (value) {
+                            (value) async {
                               textMessageBubble.add(ChatModels(sender: false, text: value));
-                              // _speak(value);
+                              await chatControllers.insertMessage(
+                                isSender: false,
+                                message: value
+                              );
+                              _speak(value);
                               setState(() {
                                 _scrollController.animateTo(
                                   _scrollController.position.maxScrollExtent,

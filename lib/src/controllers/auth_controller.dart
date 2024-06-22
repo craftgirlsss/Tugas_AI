@@ -64,9 +64,9 @@ class AuthController extends GetxController{
     String? uuid = prefs.getString('uuid');
     print("ini UUID $uuid");
     isLoading(true);
-    List result = await Supabase.instance.client.from('tugas_ai_auth').select('*').eq('uuid', uuid!).limit(1);
+    List? result = await Supabase.instance.client.from('tugas_ai_auth').select('*').eq('uuid', uuid!).limit(1);
     print(result);
-    if(result.length == 0){
+    if(result.isEmpty){
       isLoading(false);
       return false;
     }else{
